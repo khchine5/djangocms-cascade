@@ -32,7 +32,7 @@ class SimpleWrapperPlugin(TransparentMixin, CascadePluginBase):
         identifier = super(SimpleWrapperPlugin, cls).get_identifier(instance)
         tag_name = dict(cls.TAG_CHOICES).get(instance.glossary.get('tag_type'))
         if tag_name:
-            return format_html('{0}{1}', identifier, tag_name)
+            return format_html('{0} {1}', tag_name, identifier)
         return identifier
 
     def get_render_template(self, context, instance, placeholder):
@@ -58,10 +58,10 @@ class HeadingPlugin(CascadePluginBase):
     name = _("Heading")
     parent_classes = None
     allow_children = False
-    TAG_CHOICES = tuple((k, _("Heading {}").format(k)) for k in range(1, 7))
+    TAG_TYPES = tuple(('h{}'.format(k), _("Heading {}").format(k)) for k in range(1, 7))
     glossary_fields = (
-        PartialFormField('head_size',
-            widgets.Select(choices=TAG_CHOICES)),
+        PartialFormField('tag_type',
+            widgets.Select(choices=TAG_TYPES)),
         PartialFormField('content',
             widgets.TextInput(attrs={'style': 'width: 350px;'}),
              _("Heading content")),
@@ -73,16 +73,12 @@ class HeadingPlugin(CascadePluginBase):
 
     @classmethod
     def get_identifier(cls, instance):
-        head_size = instance.glossary.get('head_size')
+        identifier = super(HeadingPlugin, cls).get_identifier(instance)
+        tag_type = instance.glossary.get('tag_type')
         content = instance.glossary.get('content')
-        if head_size:
-            return format_html('<strong>{0}</strong>: {1}', head_size, content)
+        if tag_type:
+            return format_html('<code>{0}</code>: {1} {2}', tag_type, content, identifier)
         return content
-
-    def render(self, context, instance, placeholder):
-        context = super(HeadingPlugin, self).render(context, instance, placeholder)
-        context['glossary'] = instance.glossary
-        return context
 
 plugin_pool.register_plugin(HeadingPlugin)
 

@@ -2,10 +2,13 @@
 from __future__ import unicode_literals
 
 from django.db import models
+from django.db.models.signals import pre_delete
 from django.utils.encoding import python_2_unicode_compatible
 from django.utils.translation import ugettext_lazy as _
 from django.contrib.sites.models import Site
 from jsonfield.fields import JSONField
+from cms.extensions import PageExtension
+from cms.extensions.extension_pool import extension_pool
 from .models_base import CascadeModelBase
 
 
@@ -30,6 +33,8 @@ class CascadeElement(CascadeModelBase):
     """
     The concrete model class to store arbitrary data for plugins derived from CascadePluginBase.
     """
+    shared_glossary = models.ForeignKey(SharedGlossary, blank=True, null=True, on_delete=models.SET_NULL, editable=False)
+
     class Meta:
         db_table = 'cmsplugin_cascade_element'
 
@@ -45,14 +50,12 @@ class CascadeElement(CascadeModelBase):
             init_element(sortinline_element)
 
 
-class SharableCascadeElement(CascadeModelBase):
+class SharableCascadeElement(CascadeElement):
     """
-    A model class with an additional foreign key to a shared glossary.
+    A proxy model which takes care of merging the glossary with its shared instance.
     """
-    shared_glossary = models.ForeignKey(SharedGlossary, blank=True, null=True, on_delete=models.SET_NULL)
-
     class Meta:
-        db_table = 'cmsplugin_cascade_sharableelement'
+        proxy = True
 
     def __getattribute__(self, name):
         """
@@ -125,3 +128,38 @@ class CascadeClipboard(models.Model):
 
     def __str__(self):
         return self.identifier
+
+
+class CascadePage(PageExtension):
+    """
+    Keep arbitrary data tightly coupled to the CMS page.
+    """
+    settings = JSONField(blank=True, default={}, help_text=_("User editable settings for this page."))
+    glossary = JSONField(blank=True, default={}, help_text=_("Store for arbitrary page data."))
+
+    class Meta:
+        db_table = 'cmsplugin_cascade_page'
+        verbose_name = verbose_name_plural = _("Cascade Page Settings")
+
+    @classmethod
+    def assure_relation(cls, cms_page):
+        """
+        Assure that we have a foreign key relation, pointing from CascadePage onto CMSPage.
+        """
+        try:
+            cms_page.cascadepage
+        except cls.DoesNotExist:
+            cls.objects.create(extended_object=cms_page)
+
+extension_pool.register(CascadePage)
+
+
+def delete_cascade_element(sender, instance=None, **kwargs):
+    if isinstance(instance, CascadeModelBase):
+        try:
+            instance.page.cascadepage.glossary['element_ids'].pop(str(instance.pk))
+            instance.page.cascadepage.save()
+        except (AttributeError, KeyError):
+            pass
+
+pre_delete.connect(delete_cascade_element)

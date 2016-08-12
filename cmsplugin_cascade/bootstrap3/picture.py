@@ -31,9 +31,7 @@ class BootstrapPicturePlugin(LinkPluginBase):
     default_css_class = 'img-responsive'
     default_css_attributes = ('image-shapes',)
     html_tag_attributes = {'image-title': 'title', 'alt-tag': 'tag'}
-    fields = ('image_file', getattr(LinkPluginBase, 'glossary_field_map')['link'], 'glossary',)
-    LINK_TYPE_CHOICES = (('none', _("No Link")),) + \
-        tuple(t for t in getattr(LinkForm, 'LINK_TYPE_CHOICES') if t[0] != 'email')
+    fields = ('image_file',) + LinkPluginBase.fields  # @UndefinedVariable
     RESIZE_OPTIONS = (('upscale', _("Upscale image")), ('crop', _("Crop image")),
                       ('subject_location', _("With subject location")),
                       ('high_resolution', _("Optimized for Retina")),)
@@ -76,16 +74,18 @@ class BootstrapPicturePlugin(LinkPluginBase):
         utils.reduce_breakpoints(self, 'responsive-heights')
         image_file = ModelChoiceField(queryset=Image.objects.all(), required=False, label=_("Image"))
         Form = type(str('ImageForm'), (ImageFormMixin, getattr(LinkForm, 'get_form_class')(),),
-            {'LINK_TYPE_CHOICES': self.LINK_TYPE_CHOICES, 'image_file': image_file})
+            {'LINK_TYPE_CHOICES': ImageFormMixin.LINK_TYPE_CHOICES, 'image_file': image_file})
         kwargs.update(form=Form)
         return super(BootstrapPicturePlugin, self).get_form(request, obj, **kwargs)
 
     def render(self, context, instance, placeholder):
         # image shall be rendered in a responsive context using the picture element
         elements = utils.get_picture_elements(context, instance)
+        fluid = instance.get_complete_glossary().get('fluid') == 'on'
         context.update({
             'is_responsive': True,
             'instance': instance,
+            'is_fluid': fluid,
             'placeholder': placeholder,
             'elements': elements,
         })

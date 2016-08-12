@@ -1,26 +1,26 @@
-
-window['jQuery'] = jQuery || django.jQuery;  // re-add to global namespace since select2 otherwise does not work
-
 django.jQuery(function($) {
 	'use strict';
-	var $link_type = $("#id_link_type");
+	var $link_type = $("#id_link_type"), $cmspage_select = $("#id_cms_page");
 
 	django.cascade.LinkPluginBase = ring.create({
 		constructor: function() {
 			var self = this;
 			this.$super();
 
-			// register event handler on changing link type select box
+			// register event handlers on changing link_type and cms_page select boxes
 			$link_type.change(function(evt) {
 				self.toggleLinkTypes(evt.target.value);
+			});
+			$cmspage_select.change(function(evt) {
+				self.toggleCMSPage(evt.target.value);
 			});
 			this.refreshChangeForm();
 		},
 		toggleLinkTypes: function(linkType) {
-			var $field_cmspage = $(".form-row.field-link_type .field-box.field-cms_page"),
-				$field_exturl = $(".form-row.field-link_type .field-box.field-ext_url"),
-				$field_mailto = $(".form-row.field-link_type .field-box.field-mail_to"),
-				$link_target = $(".glossary-widget .glossary_target");
+			var $field_cmspage = $(".form-row .field-box.field-cms_page, .form-row .field-box.field-section"),
+			    $field_exturl = $(".form-row .field-box.field-ext_url"),
+			    $field_mailto = $(".form-row .field-box.field-mail_to"),
+			    $link_target = $(".glossary-widget .glossary_target");
 
 			switch(linkType) {
 			case 'cmspage':
@@ -78,6 +78,20 @@ django.jQuery(function($) {
 			} else {
 				this.refreshChangeForm();
 			}
+		},
+		toggleCMSPage: function(page_id) {
+			var url = django.cascade.page_sections_url + page_id, $selSection = $('#id_section');
+
+			$.get(url, function(response) {
+				var k, val;
+
+				$selSection.children('option:gt(0)').remove();
+				for (k = 0; k < response.element_ids.length; k++) {
+					val = response.element_ids[k];
+					$selSection.append($("<option></option>").attr("value", val[0]).text(val[1]));
+				}
+				$selSection.val(null);
+			});
 		},
 		refreshChangeForm: function() {
 			this.toggleLinkTypes($link_type.val());

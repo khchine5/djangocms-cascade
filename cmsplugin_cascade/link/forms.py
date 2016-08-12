@@ -1,19 +1,30 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
+
 from django.conf import settings
 from django.contrib.sites.models import Site
+from django.core.exceptions import ObjectDoesNotExist
 from django.apps import apps
 from django.forms import fields
 from django.forms.models import ModelForm
 from django.utils.module_loading import import_string
 from django.utils.translation import ugettext_lazy as _
-from django.core.exceptions import ObjectDoesNotExist
 from cms.models import Page
+from cmsplugin_cascade.models import CascadePage
 
 if 'django_select2' in settings.INSTALLED_APPS:
-    SelectWidget = import_string('django_select2.forms.Select2Widget')
+    Select2Widget = import_string('django_select2.forms.Select2Widget')
 else:
-    SelectWidget = import_string('django.forms.widgets.Select')
+    Select2Widget = import_string('django.forms.widgets.Select')
+
+
+class SelectWidget(Select2Widget):
+    @property
+    def media(self):
+        parent_media = super(SelectWidget, self).media
+        # prepend JS snippet to re-add 'jQuery' to the global namespace
+        parent_media._js.insert(0, 'cascade/js/admin/jquery.restore.js')
+        return parent_media
 
 
 class LinkSearchField(fields.ChoiceField):
@@ -34,29 +45,32 @@ class LinkForm(ModelForm):
     populate the glossary of the model.
     """
     LINK_TYPE_CHOICES = (('cmspage', _("CMS Page")), ('exturl', _("External URL")), ('email', _("Mail To")),)
-    link_type = fields.ChoiceField()
+    link_type = fields.ChoiceField(label=_("Link"), help_text=_("Type of link"))
     cms_page = LinkSearchField(required=False, label='',
         help_text=_("An internal link onto CMS pages of this site"))
+    section = fields.ChoiceField(required=False, label='',
+        help_text=_("Page bookmark"))
     ext_url = fields.URLField(required=False, label='', help_text=_("Link onto external page"))
     mail_to = fields.EmailField(required=False, label='', help_text=_("Open Email program with this address"))
 
     class Meta:
         fields = ('glossary',)
 
-    def __init__(self, raw_data=None, *args, **kwargs):
+    def __init__(self, data=None, *args, **kwargs):
         instance = kwargs.get('instance')
         default_link_type = {'type': self.LINK_TYPE_CHOICES[0][0]}
-        initial = instance and dict(instance.glossary) or {'link': default_link_type}
+        initial = dict(instance.glossary) if instance else {'link': default_link_type}
         initial.update(kwargs.pop('initial', {}))
+        initial.setdefault('link', {'type': default_link_type})
         link_type = initial['link']['type']
         self.base_fields['link_type'].choices = self.LINK_TYPE_CHOICES
         self.base_fields['link_type'].initial = link_type
-        if raw_data and raw_data.get('shared_glossary'):
+        if data and data.get('shared_glossary'):
             # convert this into an optional field since it is disabled with ``shared_glossary`` set
             self.base_fields['link_type'].required = False
-        set_initial_linktype = getattr(self, 'set_initial_{0}'.format(link_type), None)
+        set_initial_linktype = getattr(self, 'set_initial_{}'.format(link_type), None)
 
-        # populate choice field for selecting a CMS page
+        # populate Select field for choosing a CMS page
         try:
             site = instance.page.site
         except AttributeError:
@@ -67,8 +81,25 @@ class LinkForm(ModelForm):
 
         if callable(set_initial_linktype):
             set_initial_linktype(initial)
-        kwargs.update(initial=initial)
-        super(LinkForm, self).__init__(raw_data, *args, **kwargs)
+        self._preset_section(data, initial)
+        super(LinkForm, self).__init__(data, initial=initial, *args, **kwargs)
+
+    def _preset_section(self, data, initial):
+        choices = [(None, _("Page root"))]
+        try:
+            if data:
+                cms_page = Page.objects.get(pk=data['cms_page'])
+            else:
+                cms_page = Page.objects.get(pk=initial['link']['pk'])
+        except (KeyError, ValueError, ObjectDoesNotExist):
+            pass
+        else:
+            CascadePage.assure_relation(cms_page)
+            for key, val in cms_page.cascadepage.glossary.get('element_ids', {}).items():
+                choices.append((key, val))
+
+        self.base_fields['section'].initial = initial['link'].get('section')
+        self.base_fields['section'].choices = choices
 
     def clean_glossary(self):
         """
@@ -99,6 +130,10 @@ class LinkForm(ModelForm):
                 'model': 'cms.Page',
                 'pk': self.cleaned_data['cms_page'],
             }
+
+    def clean_section(self):
+        if self.cleaned_data.get('link_type') == 'cmspage':
+            self.cleaned_data['link_data']['section'] = self.cleaned_data['section']
 
     def clean_ext_url(self):
         if self.cleaned_data.get('link_type') == 'exturl':

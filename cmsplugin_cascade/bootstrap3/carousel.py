@@ -6,6 +6,7 @@ try:
     from html.parser import HTMLParser  # py3
 except ImportError:
     from HTMLParser import HTMLParser  # py2
+from django.core.exceptions import ImproperlyConfigured
 from django.forms import widgets
 from django.utils.html import format_html
 from django.utils.translation import ungettext_lazy, ugettext_lazy as _
@@ -74,7 +75,7 @@ class CarouselPlugin(BootstrapPluginBase):
     )
 
     def get_form(self, request, obj=None, **kwargs):
-        utils.reduce_breakpoints(self, 'container_max_heights')
+        utils.reduce_breakpoints(self, 'container_max_heights', request)
         return super(CarouselPlugin, self).get_form(request, obj, **kwargs)
 
     @classmethod
@@ -135,11 +136,16 @@ class CarouselSlidePlugin(BootstrapPluginBase):
 
     def get_form(self, request, obj=None, **kwargs):
         if obj:
-            caption = self.html_parser.unescape(obj.glossary.get('caption', ''))
+            caption = self.html_parser.html.unescape(obj.glossary.get('caption', ''))
             obj.glossary.update(caption=caption)
+
+        parent_obj = self.get_parent_instance(request)
+        if not (parent_obj and issubclass(parent_obj.plugin_class, BootstrapPluginBase)):
+            raise ImproperlyConfigured("A CarouselSlidePlugin requires a valid parent")
+
         # define glossary fields on the fly, because the TextEditorWidget requires the plugin_pk
-        text_editor_widget = TextEditorWidget(installed_plugins=[TextLinkPlugin], pk=self.parent.pk,
-            placeholder=self.parent.placeholder, plugin_language=self.parent.language)
+        text_editor_widget = TextEditorWidget(installed_plugins=[TextLinkPlugin], pk=parent_obj.pk,
+            placeholder=parent_obj.placeholder, plugin_language=parent_obj.language)
         kwargs['glossary_fields'] = (
             PartialFormField('caption', text_editor_widget, label=_("Slide Caption"),
                 help_text=_("Caption text to be laid over the backgroud image."),
@@ -151,10 +157,12 @@ class CarouselSlidePlugin(BootstrapPluginBase):
         # image shall be rendered in a responsive context using the ``<picture>`` element
         elements = utils.get_picture_elements(context, instance)
         caption = self.html_parser.unescape(instance.glossary.get('caption', ''))
+        fluid = instance.get_complete_glossary().get('fluid') == 'on'
         context.update({
             'is_responsive': True,
             'instance': instance,
             'caption': plugin_tags_to_user_html(caption, context, placeholder),
+            'is_fluid': fluid,
             'placeholder': placeholder,
             'elements': elements,
         })

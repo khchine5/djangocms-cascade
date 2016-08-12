@@ -4,12 +4,20 @@
 Link Plugin
 ===========
 
-**djangocms-cascade** ships with its own Link plugin. This is because other plugins from
-**djangocms-cascade**, such as ButtonPlugin, ImagePlugin or PicturePlugin require the functionality
-to set links to internal- and external URLs. The de-facto plugin for links, djangocms-link_ can't
-be used as a base class for these plugins, therefore an alternative implementation has been
-created. And as all other Cascade plugins, the LinkPlugin also keeps its data in a JSON field.
+**djangocms-cascade** ships with its own link plugin. This is because other plugins from the
+Cascade eco-system, such as the **BootstrapButtonPlugin**, the **BootstrapImagePlugin** or the
+**BootstrapPicturePlugin** also require the functionality to set links to internal- and external
+URLs. Since we do not want to duplicate the linking functionality for each of these plugins, it has
+been moved into its own base class. Therefore we will use the terminology **TextLinkPlugin** when
+referring to text-based links.
 
+The de-facto plugin for links, djangocms-link_ can't be used as a base class for these plugins,
+hence an alternative implementation has been created within the Cascade framework. The link related
+data is stored in a sub-dictionary named ``link`` in our main JSON field.
+
+
+Prerequisites
+=============
 
 Before using this plugin, assure that ``'cmsplugin_cascade.link'`` is member of the list or
 tuple ``CMSPLUGIN_CASCADE_PLUGINS`` in the project's ``settings.py``.
@@ -98,15 +106,26 @@ a URL and thus add the method get_absolute_url_ to that Django model. Since such
 CMS page, nor a URL to an external web page, it would be convenient to access that model using a
 special Link type.
 
-For example, this special Link plugin is used by **djangoSHOP** to allow direct linking from a CMS
-page to a shop's product.
+For example, in **djangoSHOP** we can allow to link directly from a CMS page to a shop's product.
+This is achieved by reconfiguring the Link Plugin inside Cascade with:
 
-.. literalinclude:: _static/shop_link_plugin.py
-	:linenos:
-	:language: python
+.. code-block:: python
 
-When using this implementation, remember to change ``CMSPLUGIN_CASCADE_PLUGINS`` in your project's
-``settings.py`` to that alternative Link plugin.
+	CMSPLUGIN_CASCADE = {
+	    ...
+	    'dependencies': {
+	        'shop/js/admin/shoplinkplugin.js': 'cascade/js/admin/linkpluginbase.js',
+	    },
+	    'link_plugin_classes': (
+	        'shop.cascade.plugin_base.CatalogLinkPluginBase',
+	        'cmsplugin_cascade.link.plugin_base.LinkElementMixin',
+	        'shop.cascade.plugin_base.CatalogLinkForm',
+	    ),
+	}
+
+The tuple specified through ``link_plugin_classes`` replaces the base class for the LinkPlugi class
+and the form class for its editor. Please refer to the django-shop_ for implementation details of
+the classes.
 
 Now the select box for **Link type** will offer one additional option: “Product”. When this is
 selected, the site administrator can choose between all of the shops products.
@@ -114,3 +133,4 @@ selected, the site administrator can choose between all of the shops products.
 .. _djangocms-link: https://github.com/divio/djangocms-link
 .. _djangocms-text-ckeditor: https://github.com/divio/djangocms-text-ckeditor
 .. _get_absolute_url: https://docs.djangoproject.com/en/1.7/ref/models/instances/#get-absolute-url
+.. _django-shop: https://github.com/awesto/django-shop

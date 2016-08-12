@@ -16,6 +16,7 @@ from . import settings
 from .mixins import TransparentMixin
 from .models_base import CascadeModelBase
 from .models import CascadeElement, SharableCascadeElement
+from .generic.mixins import SectionMixin, SectionModelMixin
 from .sharable.forms import SharableGlossaryMixin
 from .extra_fields.mixins import ExtraFieldsMixin
 from .widgets import JSONMultiWidget
@@ -52,12 +53,17 @@ class CascadePluginBaseMetaclass(CMSPluginBaseMetaclass):
     classes.
     """
     plugins_with_extra_fields = list(settings.CMSPLUGIN_CASCADE['plugins_with_extra_fields'])
+    plugins_with_bookmark = list(settings.CMSPLUGIN_CASCADE['plugins_with_bookmark'])
     plugins_with_sharables = dict(settings.CMSPLUGIN_CASCADE['plugins_with_sharables'])
 
     def __new__(cls, name, bases, attrs):
+        model_mixins = attrs.pop('model_mixins', ())
         if name in cls.plugins_with_extra_fields:
             ExtraFieldsMixin.media = media_property(ExtraFieldsMixin)
             bases = (ExtraFieldsMixin,) + bases
+        if name in cls.plugins_with_bookmark:
+            bases = (SectionMixin,) + bases
+            model_mixins = (SectionModelMixin,) + model_mixins
         if name in cls.plugins_with_sharables:
             SharableGlossaryMixin.media = media_property(SharableGlossaryMixin)
             bases = (SharableGlossaryMixin,) + bases
@@ -69,7 +75,6 @@ class CascadePluginBaseMetaclass(CMSPluginBaseMetaclass):
         if name in settings.CMSPLUGIN_CASCADE['plugins_with_extra_render_templates'].keys():
             RenderTemplateMixin.media = media_property(RenderTemplateMixin)
             bases = (RenderTemplateMixin,) + bases
-        model_mixins = attrs.pop('model_mixins', ())
         if name == 'SegmentPlugin':
             # SegmentPlugin shall additionally inherit from configured mixin classes
             model_mixins += tuple(import_string(mc[0]) for mc in settings.CMSPLUGIN_CASCADE['segmentation_mixins'])
@@ -233,16 +238,20 @@ class CascadePluginBase(six.with_metaclass(CascadePluginBaseMetaclass, CMSPlugin
                     new_obj.glossary[key] = old_obj.glossary[key]
         super(CascadePluginBase, self).save_model(request, new_obj, form, change)
 
-    def get_parent_instance(self):
+    def get_parent_instance(self, request=None):
         """
-        Get the parent model instance corresponding to this plugin. Returns None if the current
-        plugin instance is the root model.
+        Get the parent model instance corresponding to this plugin. When adding a new plugin, the
+        parent might not be available. Therefore as fallback, pass in the request object.
         """
+        try:
+            parent_id = self.parent.id
+        except AttributeError:
+            parent_id = request.GET.get('plugin_parent') if request else None
         for model in CascadeModelBase._get_cascade_elements():
             try:
-                return model.objects.get(id=self.parent.id)
-            except (AttributeError, ObjectDoesNotExist):
-                pass
+                return model.objects.get(id=parent_id)
+            except model.DoesNotExist:
+                continue
 
     def get_previous_instance(self, obj):
         """
@@ -276,10 +285,11 @@ class CascadePluginBase(six.with_metaclass(CascadePluginBaseMetaclass, CMSPlugin
         context['base_plugins'] = ['django.cascade.{}'.format(b) for b in bases]
 
         # remove glossary field from rendered form
+        form = context['adminform'].form
         try:
-            fields = list(context['adminform'].form.fields)
+            fields = list(form.fields)
             fields.remove('glossary')
-            context['empty_form'] = len(fields) + len(context['adminform'].form.glossary_fields) == 0
+            context['empty_form'] = len(fields) + len(form.glossary_fields) == 0
         except KeyError:
             pass
         return super(CascadePluginBase, self).render_change_form(request, context, add, change, form_url, obj)
