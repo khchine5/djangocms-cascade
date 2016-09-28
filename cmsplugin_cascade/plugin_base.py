@@ -52,9 +52,10 @@ class CascadePluginBaseMetaclass(CMSPluginBaseMetaclass):
     by a user defined configuration, this meta-class conditionally inherits from additional mixin
     classes.
     """
-    plugins_with_extra_fields = list(settings.CMSPLUGIN_CASCADE['plugins_with_extra_fields'])
+    plugins_with_extra_fields = dict(settings.CMSPLUGIN_CASCADE['plugins_with_extra_fields'])
     plugins_with_bookmark = list(settings.CMSPLUGIN_CASCADE['plugins_with_bookmark'])
     plugins_with_sharables = dict(settings.CMSPLUGIN_CASCADE['plugins_with_sharables'])
+    plugins_with_extra_render_templates = settings.CMSPLUGIN_CASCADE['plugins_with_extra_render_templates'].keys()
 
     def __new__(cls, name, bases, attrs):
         model_mixins = attrs.pop('model_mixins', ())
@@ -72,7 +73,7 @@ class CascadePluginBaseMetaclass(CMSPluginBaseMetaclass):
             base_model = SharableCascadeElement
         else:
             base_model = CascadeElement
-        if name in settings.CMSPLUGIN_CASCADE['plugins_with_extra_render_templates'].keys():
+        if name in cls.plugins_with_extra_render_templates:
             RenderTemplateMixin.media = media_property(RenderTemplateMixin)
             bases = (RenderTemplateMixin,) + bases
         if name == 'SegmentPlugin':
@@ -281,9 +282,12 @@ class CascadePluginBase(six.with_metaclass(CascadePluginBaseMetaclass, CMSPlugin
         return None, None
 
     def render_change_form(self, request, context, add=False, change=False, form_url='', obj=None):
-        # determined dependencies for ring.js
-        bases = self.get_ring_bases()
-        context['base_plugins'] = ['django.cascade.{}'.format(b) for b in bases]
+        context.update(
+            base_plugins=['django.cascade.{}'.format(b) for b in self.get_ring_bases()],
+            plugin_title=string_concat(self.module, " ", self.name, " Plugin"),
+            plugin_intro=mark_safe(getattr(self, 'intro_html', '')),
+            plugin_footnote=mark_safe(getattr(self, 'footnote_html', '')),
+        )
 
         # remove glossary field from rendered form
         form = context['adminform'].form

@@ -111,19 +111,19 @@ msgstr "Akkordeon"
 
 #: bootstrap3/accordion.py:42
 msgid "Close others"
-msgstr "Schließe die Anderen"
+msgstr "Schließe die anderen"
 
 #: bootstrap3/accordion.py:44
 msgid "Open only one panel at a time."
-msgstr "Öffne nur eine Panele zur Zeit."
+msgstr "Öffne nur ein Panel zur Zeit."
 
 #: bootstrap3/accordion.py:48
 msgid "First panel open"
-msgstr "Erste Panele offen"
+msgstr "Erstes Panel geöffnet"
 
 #: bootstrap3/accordion.py:50
 msgid "Start with the first panel open."
-msgstr "Starte mit geöffneter erster Panele."
+msgstr "Beginne mit erstem Panel geöffnet."
 
 #: bootstrap3/accordion.py:58
 #, python-brace-format
