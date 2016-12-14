@@ -77,7 +77,8 @@ class SegmentPlugin(TransparentMixin, CascadePluginBase):
             evaluated_to = False
             template_error_message = None
             try:
-                eval_template = engines['django'].from_string(self.eval_template_string.format(condition))
+                template_string = self.eval_template_string.format(condition)
+                eval_template = engines['django'].from_string(template_string)
                 evaluated_to = eval_template.render(context) == 'True'
             except TemplateSyntaxError as err:
                 # TODO: render error message into template
@@ -131,8 +132,12 @@ class SegmentPlugin(TransparentMixin, CascadePluginBase):
         return template
 
     def render(self, context, instance, placeholder):
-        if not hasattr(context['request'], '_evaluated_instances'):
-            context['request']._evaluated_instances = {}
+        request = context['request']
+        if not hasattr(request, '_evaluated_instances'):
+            request._evaluated_instances = {}
+        if LooseVersion(cms_version) > LooseVersion('3.3'):
+            context.update(instance.get_context_override(request))
+
         return super(SegmentPlugin, self).render(context, instance, placeholder)
 
     def get_form(self, request, obj=None, **kwargs):
