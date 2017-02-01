@@ -4,6 +4,39 @@
 Release History
 ===============
 
+0.12.0.dev0
+-----------
+* Added compatibility for Django version 1.10.
+* Added compatibility for django-CMS version 3.4.
+* Added compatibility for djangocms-text-ckeditor-3.4.
+* In the ``CarouselSlide`` plugin, caption is added as a child ``TextPlugin`` instead of using the
+  glossary. Currently the migration of ``TextLinkPlugins`` inside this caption field does not work
+  properly. Please create an issue, if you really need it.
+* Added method ``value_omitted_from_data`` to ``JSONMultiWidget`` to override the Django method
+  implemented in ``django.forms.widgets.MultiWidget``.
+* In ``cmsplugin_cascade.models.CascadeElement`` the foreign key ``shared_glossary`` now is marked
+  as editable. Instead to plugins without sharable glossary, the attribute
+  ``exclude = ['shared_glossary']`` is added.
+* Instead of handling ring.js plugin inheritance through ``get_ring_bases()``, Cascade plugins
+  just have to add ``ring_plugin = '...'`` to their class declaration.
+* Function ``cmsplugin_cascade.utils.resolve_dependencies`` is deprecated, since Javascript
+  dependencies now are handled via their natural inheritance relation.
+* The configuration option ``settings.CMSPLUGIN_CASCADE['dependencies']`` has been removed.
+* Added method ``save()`` to model ``SharedGlossary``, which filters the glossary to be stored to
+  only those fields marked as sharable.
+* Accessing the CMS page via ``plugin_instance.page`` is deprecated and has been replaced by
+  invocations to ``plugin_instance.placeholder.page``.
+* Removed directory ``static/cascade/css/fonts/glyphicons-halflings``, since they are available
+  through the Bootstrap npm packages.
+* All Javascript files accessing a property ``disabled``, now use the proper jQuery function
+  intended for it.
+* Added interface to upload fonts and use them as framed icons, text icons or button
+  decorators.
+* The permission system now is fine grained. Administrators can give their staff users
+  add/change/delete permissions to each of the many Cascade plugins. When adding new plugins, this
+  does not even require a database migration.
+
+
 0.11.1
 ------
 * Added preconfigured ``FilePathField`` to prevent the creation of useless migration files.

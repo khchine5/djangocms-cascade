@@ -49,9 +49,6 @@ class CascadeModelBase(CMSPlugin):
         attributes = self.plugin_class.get_html_tag_attributes(self)
         return format_html_join(' ', '{0}="{1}"', ((attr, val) for attr, val in attributes.items() if val))
 
-    def get_parent(self):
-        raise NotImplementedError("This method is deprecated. Use `get_parent_instance` instead.")
-
     def get_parent_glossary(self):
         """
         Return the glossary from the parent of this object. If there is no parent, retrieve
@@ -103,12 +100,6 @@ class CascadeModelBase(CMSPlugin):
                 super(CascadeModelBase, self).save(no_signals=True)
         else:
             super(CascadeModelBase, self).save(*args, **kwargs)
-
-    def get_data_representation(self):
-        """
-        Hook to return a serializable representation of this element.
-        """
-        return {'glossary': self.glossary}
 
     @classmethod
     def _get_cascade_elements(cls):

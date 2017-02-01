@@ -3,6 +3,7 @@ from __future__ import unicode_literals
 
 import os, shutil
 from collections import OrderedDict
+
 from django.conf import settings
 from django.db import models
 from django.utils.encoding import python_2_unicode_compatible, force_text
@@ -10,8 +11,10 @@ from django.utils.functional import cached_property
 from django.utils.six.moves.urllib.parse import urljoin
 from django.utils.translation import ugettext_lazy as _
 from django.contrib.sites.models import Site
+
 from jsonfield.fields import JSONField
 from filer.fields.file import FilerFileField
+
 from cms.extensions import PageExtension
 from cms.extensions.extension_pool import extension_pool
 from cms.plugin_pool import plugin_pool
@@ -35,15 +38,26 @@ class SharedGlossary(models.Model):
     def __str__(self):
         return self.identifier
 
+    def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
+        """
+        Only entries which are declared as sharable, shall be stored in the sharable glossary.
+        """
+        plugin_instance = plugin_pool.get_plugin(self.plugin_type)
+        glossary = dict((key, value) for key, value in self.glossary.items()
+                        if key in plugin_instance.sharable_fields)
+        self.glossary = glossary
+        super(SharedGlossary, self).save(force_insert, force_update, using, update_fields)
+
 
 class CascadeElement(CascadeModelBase):
     """
     The concrete model class to store arbitrary data for plugins derived from CascadePluginBase.
     """
-    shared_glossary = models.ForeignKey(SharedGlossary, blank=True, null=True, on_delete=models.SET_NULL, editable=False)
+    shared_glossary = models.ForeignKey(SharedGlossary, blank=True, null=True, on_delete=models.SET_NULL)
 
     class Meta:
         db_table = 'cmsplugin_cascade_element'
+        verbose_name = _("Element")
 
     def copy_relations(self, oldinstance):
         def init_element(inline_element):
@@ -55,6 +69,9 @@ class CascadeElement(CascadeModelBase):
             init_element(inline_element)
         for sortinline_element in oldinstance.sortinline_elements.all():
             init_element(sortinline_element)
+
+    def get_parent_instance(self):
+        return CascadeElement.objects.get(pk=self.parent_id)
 
 
 class SharableCascadeElement(CascadeElement):
@@ -72,10 +89,6 @@ class SharableCascadeElement(CascadeElement):
         if name == 'glossary' and self.shared_glossary:
             attribute.update(self.shared_glossary.glossary)
         return attribute
-
-    def get_data_representation(self):
-        # TODO: merge with shared_glossary
-        return {'glossary': self.glossary}
 
 
 class InlineCascadeElement(models.Model):
@@ -170,8 +183,8 @@ class CascadePage(PageExtension):
     def delete_cascade_element(cls, instance=None, **kwargs):
         if isinstance(instance, CascadeModelBase):
             try:
-                instance.page.cascadepage.glossary['element_ids'].pop(str(instance.pk))
-                instance.page.cascadepage.save()
+                instance.placeholder.page.cascadepage.glossary['element_ids'].pop(str(instance.pk))
+                instance.placeholder.page.cascadepage.save()
             except (AttributeError, KeyError):
                 pass
 

@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
+
 try:
     from django.contrib.sites.shortcuts import get_current_site
 except ImportError:
@@ -7,7 +8,8 @@ except ImportError:
 from django.core.exceptions import ObjectDoesNotExist
 from django.apps import apps
 from django.utils.encoding import python_2_unicode_compatible
-from cms.utils.placeholder import get_placeholder_conf
+
+from cmsplugin_cascade.models import InlineCascadeElement, SortableInlineCascadeElement
 
 
 @python_2_unicode_compatible
@@ -32,28 +34,35 @@ class ImagePropertyMixin(object):
         return self._image_model
 
 
-class TransparentMixin(object):
+class WithInlineElementsMixin(object):
     """
-    Add this mixin class to other Cascade plugins, wishing to be added transparently between two
-    plugins restricting parent-children relationships.
-    For instance: A ColumnPlugin can only be added as a child to a RowPlugin. This means that no
-    other wrapper can be added between those two plugins. By adding this mixin class we can allow
-    any plugin to behave transparently, just as if it would not have be inserted into the DOM tree.
-    When moving plugins in- and out of transparent wrapper plugins, always reload the page, so that
-    the parent-children relationships can be updated.
+    Plugins wishing to allow child elements as inlines, shall inherit from this
+    mixin class, in order to override the serialize and deserialize methods.
     """
-    def get_child_classes(self, slot, page):
-        if not hasattr(self, '_cached_child_classes'):
-            if self.cms_plugin_instance:
-                if self.cms_plugin_instance.parent:
-                    parent_plugin_instance, parent_plugin = self.cms_plugin_instance.parent.get_plugin_instance()
-                    parent_plugin.cms_plugin_instance = parent_plugin_instance
-                    child_classes = set(parent_plugin.get_child_classes(slot, page))
-                else:  # SegmentPlugin is at the root level
-                    template = page and page.get_template() or None
-                    child_classes = set(get_placeholder_conf('plugins', slot, template, default=[]))
-            else:
-                child_classes = set()
-            child_classes.update(super(TransparentMixin, self).get_child_classes(slot, page))
-            self._cached_child_classes = tuple(child_classes)
-        return self._cached_child_classes
+    @classmethod
+    def get_data_representation(cls, instance):
+        inlines = [ie.glossary for ie in instance.inline_elements.all()]
+        return {'glossary': instance.glossary, 'inlines': inlines}
+
+    @classmethod
+    def add_inline_elements(cls, instance, inlines):
+        for inline_glossary in inlines:
+            InlineCascadeElement.objects.create(
+                cascade_element=instance, glossary=inline_glossary)
+
+
+class WithSortableInlineElementsMixin(object):
+    """
+    Plugins wishing to allow child elements as sortable inlines, shall inherit from this
+    mixin class, in order to override the serialize and deserialize methods.
+    """
+    @classmethod
+    def get_data_representation(cls, instance):
+        inlines = [ie.glossary for ie in instance.sortinline_elements.all()]
+        return {'glossary': instance.glossary, 'inlines': inlines}
+
+    @classmethod
+    def add_inline_elements(cls, instance, inlines):
+        for order, inline_glossary in enumerate(inlines, 1):
+            SortableInlineCascadeElement.objects.create(
+                cascade_element=instance, glossary=inline_glossary, order=order)

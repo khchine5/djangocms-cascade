@@ -1,10 +1,46 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
-from django.apps import apps
+import warnings
+
 from django.core.exceptions import ValidationError
+from django.contrib.staticfiles.finders import get_finders
 from django.utils.translation import ugettext_lazy as _
-from cmsplugin_cascade import settings
+
+try:
+    from django.utils.functional import keep_lazy_text
+except ImportError:
+    # backported from Django-1.10
+    # TODO: remove when dropping support for Django-1.9
+    from django.utils import six
+    from django.utils.functional import lazy, wraps, Promise
+
+    def keep_lazy(*resultclasses):
+        if not resultclasses:
+            raise TypeError("You must pass at least one argument to keep_lazy().")
+
+        def decorator(func):
+            lazy_func = lazy(func, *resultclasses)
+
+            @wraps(func)
+            def wrapper(*args, **kwargs):
+                for arg in list(args) + list(six.itervalues(kwargs)):
+                    if isinstance(arg, Promise):
+                        break
+                else:
+                    return func(*args, **kwargs)
+                return lazy_func(*args, **kwargs)
+
+            return wrapper
+
+        return decorator
+
+    def keep_lazy_text(func):
+        return keep_lazy(six.text_type)(func)
+
+@keep_lazy_text
+def format_lazy(format_string, *args, **kwargs):
+    return format_string.format(*args, **kwargs)
 
 
 def remove_duplicates(lst):
@@ -24,8 +60,22 @@ def resolve_dependencies(filenames):
     Use this function to automatically resolve dependencies of CSS and JavaScript files in the
     ``Media`` subclasses.
     """
+    from cmsplugin_cascade import settings
+
+    warnings.warn(
+        'resolve_dependencies() is deprecated and will be removed.',
+        DeprecationWarning,
+        stacklevel=2,
+    )
+
+    def find_file(path):
+        for finder in get_finders():
+            result = finder.find(path)
+            if result:
+                return result
+
     dependencies = []
-    if isinstance(filenames, (list, tuple)):
+    if isinstance(filenames, (list, tuple, set)):
         for filename in filenames:
             dependencies.extend(resolve_dependencies(filename))
     else:
@@ -33,7 +83,8 @@ def resolve_dependencies(filenames):
         dependency_list = settings.CMSPLUGIN_CASCADE['dependencies'].get(filename)
         if dependency_list:
             dependencies.extend(resolve_dependencies(dependency_list))
-        dependencies.append(filename)
+        if find_file(filename):
+            dependencies.append(filename)
     return remove_duplicates(dependencies)
 
 
@@ -55,6 +106,8 @@ def validate_link(link_data):
     """
     Check if the given model exists, otherwise raise a Validation error
     """
+    from django.apps import apps
+
     try:
         Model = apps.get_model(*link_data['model'].split('.'))
         Model.objects.get(pk=link_data['pk'])
