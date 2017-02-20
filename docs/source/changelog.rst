@@ -8,7 +8,11 @@ Release History
 -----------
 * Added compatibility for Django version 1.10.
 * Added compatibility for django-CMS version 3.4.
+* Added monkey patch to resolve issues handled by PR https://github.com/divio/django-cms/pull/5809
 * Added compatibility for djangocms-text-ckeditor-3.4.
+* **Important for AngularJS users**: Please upgrade to angular-ui-bootstrap version 0.14.3. All
+  versions later than 0.13 use the prefix ``uib-`` on all AngularJS directives, hence this upgrade
+  is required.
 * In the ``CarouselSlide`` plugin, caption is added as a child ``TextPlugin`` instead of using the
   glossary. Currently the migration of ``TextLinkPlugins`` inside this caption field does not work
   properly. Please create an issue, if you really need it.
@@ -30,11 +34,16 @@ Release History
   through the Bootstrap npm packages.
 * All Javascript files accessing a property ``disabled``, now use the proper jQuery function
   intended for it.
-* Added interface to upload fonts and use them as framed icons, text icons or button
-  decorators.
+* Added interface to upload fonts and use them as framed icons, text icons or button decorators.
 * The permission system now is fine grained. Administrators can give their staff users
   add/change/delete permissions to each of the many Cascade plugins. When adding new plugins, this
   does not even require a database migration.
+* Fixed: On saving a **CarouselPlugin**, the glossary of it's children, ie. **CarouselSlidePlugin**,
+  is sanitized.
+* Handle the high resolution of the **PicturePlugin** through ``srcset`` rather than a ``@media``
+  query.
+* Handle the high resolution background of the **JumbotronPlugin** through ``image-set`` rather than
+  a ``@media`` query.
 
 
 0.11.1
