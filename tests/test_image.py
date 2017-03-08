@@ -5,8 +5,10 @@ import os
 from bs4 import BeautifulSoup
 from django.core.files import File as DjangoFile
 from django.http import QueryDict
+
 from filer.models.foldermodels import Folder
 from filer.models.imagemodels import Image
+
 from cms.api import add_plugin
 from cms.utils.plugins import build_plugin_tree
 from cmsplugin_cascade.models import SharableCascadeElement
@@ -34,7 +36,7 @@ class ImagePluginTest(CascadeTestCase):
         # create container
         container_model = add_plugin(self.placeholder, BootstrapContainerPlugin, 'en',
             glossary={'breakpoints': BS3_BREAKPOINT_KEYS})
-        container_plugin = container_model.get_plugin_class_instance(self.admin_site)
+        container_plugin = container_model.get_plugin_class_instance()
         self.assertIsInstance(container_plugin, BootstrapContainerPlugin)
 
         # add one row
@@ -53,7 +55,7 @@ class ImagePluginTest(CascadeTestCase):
         # add an image
         image_model = add_plugin(self.placeholder, BootstrapImagePlugin, 'en', target=column_model)
         self.assertIsInstance(image_model, SharableCascadeElement)
-        image_plugin = image_model.get_plugin_class_instance(self.admin_site)
+        image_plugin = image_model.get_plugin_class_instance()
         self.assertIsInstance(image_plugin, BootstrapImagePlugin)
         image_plugin.cms_plugin_instance = image_model.cmsplugin_ptr
 

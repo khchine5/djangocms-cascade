@@ -13,7 +13,6 @@ from filer.models.imagemodels import Image
 from cms.plugin_pool import plugin_pool
 from cmsplugin_cascade.fields import GlossaryField
 from cmsplugin_cascade.plugin_base import CascadePluginMixinBase
-from cmsplugin_cascade.utils import resolve_dependencies
 from cmsplugin_cascade.mixins import ImagePropertyMixin
 from cmsplugin_cascade.widgets import CascadingSizeWidget
 from cmsplugin_cascade.link.config import LinkPluginBase, LinkElementMixin, LinkForm
@@ -33,6 +32,7 @@ class ImageFormMixin(object):
         super(ImageFormMixin, self).__init__(*args, **kwargs)
 
     def clean_glossary(self):
+        # TODO: remove this someday
         assert isinstance(self.cleaned_data['glossary'], dict)
         return self.cleaned_data['glossary']
 
@@ -71,12 +71,12 @@ class BootstrapImagePlugin(ImageAnnotationMixin, LinkPluginBase):
     name = _("Image")
     model_mixins = (ImagePropertyMixin, LinkElementMixin,)
     module = 'Bootstrap'
-    parent_classes = ['BootstrapColumnPlugin', 'SimpleWrapperPlugin']
+    parent_classes = ('BootstrapColumnPlugin',)
     require_parent = True
     allow_children = False
     raw_id_fields = ('image_file',)
-    text_enabled = True
     admin_preview = False
+    ring_plugin = 'ImagePlugin'
     render_template = 'cascade/bootstrap3/linked-image.html'
     default_css_attributes = ('image_shapes',)
     html_tag_attributes = {'image_title': 'title', 'alt_tag': 'tag'}
@@ -120,7 +120,7 @@ class BootstrapImagePlugin(ImageAnnotationMixin, LinkPluginBase):
     )
 
     class Media:
-        js = resolve_dependencies('cascade/js/admin/imageplugin.js')
+        js = ['cascade/js/admin/imageplugin.js']
 
     def get_form(self, request, obj=None, **kwargs):
         utils.reduce_breakpoints(self, 'responsive_heights', request=request, obj=obj)

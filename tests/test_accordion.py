@@ -3,7 +3,7 @@ from __future__ import unicode_literals
 
 from bs4 import BeautifulSoup
 from django.test import override_settings
-from cms.api import add_plugin, create_page
+from cms.api import add_plugin
 from cms.utils.plugins import build_plugin_tree
 from cmsplugin_cascade.bootstrap3.container import (BootstrapContainerPlugin, BootstrapRowPlugin,
         BootstrapColumnPlugin)
@@ -11,6 +11,7 @@ from cmsplugin_cascade.bootstrap3.accordion import (BootstrapAccordionPlugin,
     BootstrapAccordionPanelPlugin)
 from cmsplugin_cascade.bootstrap3 import settings
 from .test_base import CascadeTestCase
+
 
 BS3_BREAKPOINT_KEYS = list(tp[0] for tp in settings.CMSPLUGIN_CASCADE['bootstrap3']['breakpoints'])
 
@@ -21,7 +22,7 @@ class AccordionPluginTest(CascadeTestCase):
         # create container
         container_model = add_plugin(self.placeholder, BootstrapContainerPlugin, 'en',
             glossary={'breakpoints': BS3_BREAKPOINT_KEYS})
-        container_plugin = container_model.get_plugin_class_instance(self.admin_site)
+        container_plugin = container_model.get_plugin_class_instance()
         self.assertIsInstance(container_plugin, BootstrapContainerPlugin)
 
         # add one row
@@ -39,14 +40,14 @@ class AccordionPluginTest(CascadeTestCase):
 
         # add accordion plugin
         accordion_model = add_plugin(self.placeholder, BootstrapAccordionPlugin, 'en', target=column_model)
-        accordion_plugin = accordion_model.get_plugin_class_instance(self.admin_site)
+        accordion_plugin = accordion_model.get_plugin_class_instance()
         self.assertIsInstance(accordion_plugin, BootstrapAccordionPlugin)
         accordion_plugin.cms_plugin_instance = accordion_model.cmsplugin_ptr
 
         # add accordion panel
         panel_model = add_plugin(self.placeholder, BootstrapAccordionPanelPlugin, 'en',
             target=accordion_model, glossary={'panel_type': "panel-danger", 'panel_title': "Foo"})
-        panel_plugin = panel_model.get_plugin_class_instance(self.admin_site)
+        panel_plugin = panel_model.get_plugin_class_instance()
         self.assertIsInstance(panel_plugin, BootstrapAccordionPanelPlugin)
         panel_plugin.cms_plugin_instance = panel_model.cmsplugin_ptr
 
@@ -75,5 +76,5 @@ class AccordionPluginTest(CascadeTestCase):
         settings.CMSPLUGIN_CASCADE['bootstrap3'].update({'template_basedir': 'angular-ui'})
         html = self.build_accordion_plugins()
         soup = BeautifulSoup(html)
-        accordion = soup.find('accordion')
+        accordion = soup.find('uib-accordion')
         self.assertIsNotNone(accordion)

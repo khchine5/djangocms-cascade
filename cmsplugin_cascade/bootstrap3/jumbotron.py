@@ -1,15 +1,16 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
-from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.forms import widgets
 from django.utils.html import format_html
 from django.utils.translation import ugettext_lazy as _
+
 from cms.plugin_pool import plugin_pool
+
+from cmsplugin_cascade import settings
 from cmsplugin_cascade.fields import GlossaryField
 from cmsplugin_cascade.mixins import ImagePropertyMixin
-from cmsplugin_cascade.utils import resolve_dependencies
 from cmsplugin_cascade.widgets import MultipleCascadingSizeWidget, ColorPickerWidget
 from .plugin_base import BootstrapPluginBase
 from .image import ImageForm
@@ -80,13 +81,14 @@ class BootstrapJumbotronPlugin(BootstrapPluginBase):
     model_mixins = (ImagePropertyMixin, ImageBackgroundMixin)
     form = JumbotronPluginForm
     default_css_class = 'jumbotron'
-    parent_classes = ['BootstrapColumnPlugin']
     require_parent = False
+    parent_classes = ('BootstrapColumnPlugin',)
     allow_children = True
     alien_child_classes = True
     raw_id_fields = ('image_file',)
     fields = ('glossary', 'image_file',)
     render_template = 'cascade/bootstrap3/jumbotron.html'
+    ring_plugin = 'JumbotronPlugin'
     ATTACHMENT_CHOICES = ('scroll', 'fixed', 'local')
     VERTICAL_POSITION_CHOICES = ('top', '10%', '20%', '30%', '40%', 'center', '60%', '70%', '80%', '90%', 'bottom')
     HORIZONTAL_POSITION_CHOICES = ('left', '10%', '20%', '30%', '40%', 'center', '60%', '70%', '80%', '90%', 'right')
@@ -165,8 +167,7 @@ class BootstrapJumbotronPlugin(BootstrapPluginBase):
     """
 
     class Media:
-        css = {'all': (settings.CMSPLUGIN_CASCADE['fontawesome_css_url'],)}
-        js = resolve_dependencies('cascade/js/admin/jumbotronplugin.js')
+        js = ['cascade/js/admin/jumbotronplugin.js']
 
     def get_form(self, request, obj=None, **kwargs):
         if self.get_parent_instance(request, obj) is None:
@@ -183,6 +184,7 @@ class BootstrapJumbotronPlugin(BootstrapPluginBase):
             'instance': instance,
             'placeholder': placeholder,
             'elements': [e for e in elements if 'media' in e] if elements else [],
+            'CSS_PREFIXES': settings.CSS_PREFIXES,
         })
         return super(BootstrapJumbotronPlugin, self).render(context, instance, placeholder)
 
