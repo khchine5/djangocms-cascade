@@ -96,7 +96,7 @@ class MarkerForm(ModelForm):
     )
 
     marker_anchor = GlossaryFormField(
-        widget=MultipleCascadingSizeWidget(['left', 'top'], allowed_units=['px'], required=False),
+        widget=MultipleCascadingSizeWidget(['left', 'top'], allowed_units=['px', '%'], required=False),
         required=False,
         label=_("Marker Anchor"),
         help_text=_("The coordinates of the icon's anchor (relative to its top left corner)."),
@@ -141,13 +141,17 @@ class MarkerForm(ModelForm):
         try:
             position = self.cleaned_data['position']
             if isinstance(position, six.string_types):
-                self.instance.glossary.update(position=json.loads(position))
-            elif isinstance(position, dict):
-                self.instance.glossary.update(position=position)
-            else:
+                position = json.loads(position)
+            elif not isinstance(position, dict):
                 raise ValueError
         except (ValueError, KeyError):
             raise ValidationError("Invalid internal position data. Check your Javascript imports.")
+        else:
+            if 'lat' not in position or 'lng' not in position:
+                # place the marker in the center of the current map
+                position = {k: v for k, v in self.instance.cascade_element.glossary['map_position'].items()
+                            if k in ['lat', 'lng']}
+            self.instance.glossary.update(position=position)
 
         marker_image = self.cleaned_data.pop('marker_image', None)
         if marker_image:
@@ -186,8 +190,8 @@ class LeafletForm(ModelForm):
         except (KeyError, AttributeError):
             initial = {}
         initial.update(kwargs.pop('initial', {}))
-        initial['map_position'] = json.dumps(initial.pop('map_position',
-                                                         app_settings.CMSPLUGIN_CASCADE['leaflet']['default_position']))
+        map_position = initial.pop('map_position', app_settings.CMSPLUGIN_CASCADE['leaflet']['default_position'])
+        initial['map_position'] = json.dumps(map_position)
         super(LeafletForm, self).__init__(data, initial=initial, *args, **kwargs)
 
     def clean(self):
@@ -280,7 +284,12 @@ class LeafletPlugin(CascadePluginBase):
                         marker_anchor = marker.glossary['marker_anchor']
                         top = parse_responsive_length(marker_anchor['top'])
                         left = parse_responsive_length(marker_anchor['left'])
-                        marker.anchor = [top[0], left[0]]
+                        if top[0] is None or left[0] is None:
+                            left = width[0] * left[1]
+                            top = width[0] * aspect_ratio * top[1]
+                        else:
+                            left, top = left[0], top[0]
+                        marker.anchor = [left, top]
                     except Exception:
                         pass
                 marker_instances.append(marker)
